@@ -1,0 +1,125 @@
+import { GoogleGenAI, Type } from "@google/genai";
+import { CATEGORY_DEFINITIONS } from "../constants";
+import { CategoryType, TimeEntry } from "../types";
+import { v4 as uuidv4 } from 'uuid';
+
+const getAiClient = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  console.log('API Key loaded:', apiKey ? `${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 5)}` : 'NOT FOUND');
+  if (!apiKey) {
+    throw new Error("API Key not found. Please set the VITE_GEMINI_API_KEY environment variable.");
+  }
+  return new GoogleGenAI({ vertexai: false, apiKey });
+};
+
+// Prompt helper to construct the context
+const getCategoryContext = () => {
+  let context = "We classify time into three categories based on these specific activities:\n";
+  Object.entries(CATEGORY_DEFINITIONS).forEach(([key, def]) => {
+    context += `- ${key} (${def.description}): ${def.activities.join(', ')}\n`;
+  });
+  return context;
+};
+
+export const parseNaturalLanguageInput = async (input: string): Promise<TimeEntry[]> => {
+  const ai = getAiClient();
+  const context = getCategoryContext();
+  const now = new Date();
+
+  const prompt = `
+    User Input: "${input}"
+    Current Date/Time: ${now.toISOString()}
+
+    Task: Analyze the user's input describing their activities.
+    1. Break down distinct activities.
+    2. Map each activity to the closest Standard Activity from the provided list.
+    3. Assign the correct Category (PRODUCTION, INVESTMENT, EXPENSE).
+    4. Parse time ranges:
+       - If user says "9点到10点" or "9:00-10:00", extract start and end times
+       - If no time specified, use current time and calculate end time from duration
+       - If only duration given (e.g., "1小时"), estimate reasonable start time
+    5. Extract keywords from the task description for goal matching (e.g., "学习编程" → ["学习", "编程"])
+    6. If the input implies a date (e.g., "yesterday", "昨天"), use that date. Otherwise use today.
+
+    ${context}
+
+    Important: Return ISO datetime strings for startTime and endTime (e.g., "2025-12-02T09:00:00.000Z")
+  `;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            task: { type: Type.STRING, description: "The task description" },
+            activity: { type: Type.STRING, description: "The standardized activity name from the list" },
+            category: { type: Type.STRING, enum: [CategoryType.INVESTMENT, CategoryType.PRODUCTION, CategoryType.EXPENSE] },
+            startTime: { type: Type.STRING, description: "ISO datetime string for start time" },
+            endTime: { type: Type.STRING, description: "ISO datetime string for end time" },
+            durationMinutes: { type: Type.INTEGER, description: "Duration in minutes" },
+            dateStr: { type: Type.STRING, description: "YYYY-MM-DD format date" },
+            keywords: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Keywords extracted from task for goal matching"
+            }
+          },
+          required: ['task', 'activity', 'category', 'startTime', 'endTime', 'durationMinutes', 'dateStr', 'keywords']
+        }
+      }
+    }
+  });
+
+  const rawEntries = JSON.parse(response.text || "[]");
+
+  // Hydrate with IDs and Timestamps
+  return rawEntries.map((entry: any) => ({
+    ...entry,
+    id: uuidv4(),
+    timestamp: new Date(entry.startTime).getTime()
+  }));
+};
+
+export const generateAiReport = async (entries: TimeEntry[], period: string): Promise<string> => {
+  const ai = getAiClient();
+  const context = getCategoryContext();
+
+  // Summarize data for the AI to reduce token usage
+  const summary = entries.map(e => `${e.dateStr} ${e.startTime.split('T')[1].substring(0,5)}-${e.endTime.split('T')[1].substring(0,5)}: ${e.task} [${e.activity}] (${e.category}) - ${e.durationMinutes}分钟`).join('\n');
+
+  const prompt = `
+    You are a high-level productivity consultant. 
+    Analyze the following time logs for a ${period} period.
+    
+    The Philosophy:
+    - Investment: Improves quality of life long-term.
+    - Production: Creates direct value.
+    - Expense: Maintenance costs of living.
+
+    Data:
+    ${summary}
+
+    ${context}
+
+    Task:
+    Provide a concise but deep analysis in Markdown format.
+    1. **Overview**: Brief summary of how time was spent.
+    2. **Balance Analysis**: Are they spending too much on Expense? Is Investment sufficient?
+    3. **Pattern Recognition**: Point out any good or bad habits visible in the logs.
+    4. **Recommendations**: Give 3 specific, actionable tips to improve their structure based on this data.
+    
+    Keep the tone professional, encouraging, and insightful. Use Chinese language for the response.
+  `;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+  });
+
+  return response.text || "无法生成报告。";
+};
