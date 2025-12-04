@@ -13,8 +13,8 @@ const getApiKey = () => {
 
 const callGeminiAPI = async (prompt: string, responseSchema?: any) => {
   const apiKey = getApiKey();
-  // 使用 Gemini 2.0 Flash Experimental（现在有付费API Key，配额应该足够）
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+  // 使用 Gemini 1.5 Flash 稳定版（付费模型）
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
 
   const requestBody: any = {
     contents: [{
