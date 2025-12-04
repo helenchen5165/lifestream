@@ -15,12 +15,16 @@ export const fetchActiveGoals = async (
   let url: string;
 
   if (proxyUrl) {
-    // If proxy URL includes /notion/, use local proxy format
-    if (proxyUrl.includes('/notion/')) {
-      url = `${proxyUrl}${notionApiPath}`;
+    // Remove trailing slash from proxyUrl
+    const cleanProxyUrl = proxyUrl.endsWith('/') ? proxyUrl.slice(0, -1) : proxyUrl;
+
+    // Check if it's our serverless function format (/api/notion-proxy) or local proxy (/notion/)
+    if (cleanProxyUrl.includes('/notion-proxy') || cleanProxyUrl.includes('/notion')) {
+      // Vercel serverless function or local proxy - just append the Notion API path
+      url = `${cleanProxyUrl}/${notionApiPath}`;
     } else {
-      // Old style proxy (like corsproxy.io)
-      url = `${proxyUrl}https://api.notion.com/${notionApiPath}`;
+      // Old style proxy (like corsproxy.io) - needs full URL
+      url = `${cleanProxyUrl}/https://api.notion.com/${notionApiPath}`;
     }
   } else {
     url = `https://api.notion.com/${notionApiPath}`;
