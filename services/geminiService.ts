@@ -13,8 +13,8 @@ const getApiKey = () => {
 
 const callGeminiAPI = async (prompt: string, responseSchema?: any) => {
   const apiKey = getApiKey();
-  // 使用付费的 Gemini 1.5 Pro 模型（或 gemini-1.5-flash 更便宜）
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+  // 使用 Gemini 1.5 Flash（速度快，成本低）
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const requestBody: any = {
     contents: [{
