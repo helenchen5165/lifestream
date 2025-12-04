@@ -13,8 +13,8 @@ const getApiKey = () => {
 
 const callGeminiAPI = async (prompt: string, responseSchema?: any) => {
   const apiKey = getApiKey();
-  // 使用 Gemini 1.5 Flash 稳定版（付费模型）
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+  // 使用 Gemini 2.5 Flash-Lite
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent`;
 
   const requestBody: any = {
     contents: [{
@@ -33,6 +33,7 @@ const callGeminiAPI = async (prompt: string, responseSchema?: any) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey
     },
     body: JSON.stringify(requestBody)
   });
