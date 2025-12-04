@@ -1,4 +1,4 @@
-// Vercel Serverless Function for Notion API CORS Proxy
+// Vercel Serverless Function for Notion API CORS Proxy (Catch-all route)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -13,9 +13,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // 从 URL 中提取 Notion API 路径
-    // 例如: /api/notion-proxy/v1/databases/xxx -> v1/databases/xxx
-    const notionPath = req.url?.replace('/api/notion-proxy/', '') || '';
+    // 从 query 参数中提取路径
+    const { path } = req.query;
+    const notionPath = Array.isArray(path) ? path.join('/') : path || '';
     const notionUrl = `https://api.notion.com/${notionPath}`;
 
     console.log(`[${new Date().toISOString()}] ${req.method} ${notionUrl}`);
